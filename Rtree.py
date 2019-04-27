@@ -1,7 +1,4 @@
 import sys
-import random
-import time
-from hilbert import HilbertRtree
 
 
 class Rtree:
@@ -272,6 +269,12 @@ class Rtree:
 
         return False
 
+    def cal_distance_euclidean(self, p0 , p1):
+        # calculate the distance between 2 points
+        if type(p0) is not self.Point or type(p1) is not self.Point:
+            raise TypeError("can only calculate the distance between two points")
+        return ((p0.x - p1.x)**2 + (p0.y - p1.y)**2)**0.5
+
     def query_region(self, a, b, c, d):
         if a > c or b > d:
             raise ValueError("point0 must be on the down right of the point1")
@@ -297,38 +300,44 @@ class Rtree:
                 if re in n.map:
                     lst = self.search_points_covered(n.map[re], region)
                     ans.extend(lst)
-
         return ans
 
-def main0():
-    # while True:
-    tree = Rtree(10)
-    htree = HilbertRtree(10)
-    lst = set()
-    for _ in range(0, 30000):
-        x = random.randint(1, 5000)
-        y = random.randint(1, 20000)
-        p = (x, y)
-        lst.add(p)
+    def bounded_NN_search(self, a, b, c, d, x, y, exclude):
+        # using euclidean distance
+        # a search algorithm that finds the nearest point of the given point within the given range
+        # a,b the down left coordinates of search area, c, d the up right coordinates of the search area.
+        # x,y the coordinates of point whose NN(nearest neighbour) needs to be find.
+        region = self.genBB([self.Point(a, b), self.Point(c, d)])
+        point = self.Point(x, y)
+        # recursive search use
+        res = self.bounded_NN_search_helper(self.root, region, point, exclude)
+        if res[0] is not None:
+            return res[0].x, res[0].y
+        return None
 
-    for p in lst:
-        tree.insert(p[0], p[1])
-        htree.insert(p[0], p[1])
+    def bounded_NN_search_helper(self, n, region, point, exclude):
+        # n root
+        # region: region to search
+        # point: point whose NN needs to be find
+        if type(n) is not self.Node or type(region) is not self.BB or type(point) is not self.Point:
+            raise TypeError("can only take Node, BB, and Point as parameters")
 
-    t0 = time.time()
-    ans0 = tree.query_region(200, 200, 800, 800)
-    t1 = time.time()
-    print(t1 - t0)
-    ans1 = htree.query_region(200, 200, 800, 800)
-    t2 = time.time()
-    print(t2 - t1)
-    # if len(ans0) != len(ans1):
-    # print(lst)
-    print(len(ans0))
-    print(len(ans1))
+        ans = None
+        mdis = sys.maxsize
+
+        if n is not None:
+            for bb in n.list_bb():
+                if self.over_lapped(bb, region):
+                    if bb is not None and self.is_point(bb) and (bb.dlp.x, bb.dlp.y) not in exclude:
+                        dis = self.cal_distance_euclidean(bb.dlp, point)
+                        if dis < mdis:
+                            mdis = dis
+                            ans = bb.dlp
+                    elif bb is not None and bb in n.map:
+                        res_ans, res_dis = self.bounded_NN_search_helper(n.map[bb], region, point, exclude)
+                        if res_ans is not None and res_dis is not None and res_dis < mdis:
+                            mdis = res_dis
+                            ans = res_ans
+        return ans, mdis
 
 
-# break
-
-
-main0()
