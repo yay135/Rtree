@@ -272,6 +272,12 @@ class Rtree:
 
         return False
 
+    def query_region(self, a, b, c, d):
+        if a > c or b > d:
+            raise ValueError("point0 must be on the down right of the point1")
+        region = self.genBB([self.Point(a, b), self.Point(c, d)])
+        return self.search_points_covered(self. root, region)
+
     def search_points_covered(self, n, region):
         # perform region query
         if type(n) is not self.Node:
@@ -299,9 +305,9 @@ def main0():
     tree = Rtree(10)
     htree = HilbertRtree(10)
     lst = set()
-    for _ in range(0, 1000000):
-        x = random.randint(1, 500000)
-        y = random.randint(1, 2000000)
+    for _ in range(0, 30000):
+        x = random.randint(1, 5000)
+        y = random.randint(1, 20000)
         p = (x, y)
         lst.add(p)
 
@@ -309,19 +315,11 @@ def main0():
         tree.insert(p[0], p[1])
         htree.insert(p[0], p[1])
 
-    r0 = tree.Point(30000, 30000)
-    r1 = tree.Point(60000, 60000)
-
-    r2 = htree.Point(30000, 30000)
-    r3 = htree.Point(60000, 60000)
-
-    region0 = tree.genBB([r0, r1])
-    region1 = htree.genBB([r2, r3])
     t0 = time.time()
-    ans0 = tree.search_points_covered(tree.root, region0)
+    ans0 = tree.query_region(200, 200, 800, 800)
     t1 = time.time()
     print(t1 - t0)
-    ans1 = htree.search_points_covered(htree.root, region1)
+    ans1 = htree.query_region(200, 200, 800, 800)
     t2 = time.time()
     print(t2 - t1)
     # if len(ans0) != len(ans1):

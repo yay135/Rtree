@@ -322,6 +322,12 @@ class HilbertRtree:
 
         return False
 
+    def query_region(self, a, b, c, d):
+        if a > c or b > d:
+            raise ValueError("point0 must be on the down right of the point1")
+        region = self.genBB([self.Point(a, b), self.Point(c, d)])
+        return self.search_points_covered(self. root, region)
+
     def search_points_covered(self, n, region):
         # perform region query
         if type(n) is not self.Node:
