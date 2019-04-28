@@ -195,7 +195,24 @@ class HilbertRtree:
             raise TypeError("bounding box required")
         return (bb.urp.x - bb.dlp.x) * (bb.urp.y - bb.dlp.x)
 
+    def insert_list(self, lst):
+        if type(lst) is not list and type(lst) is not set:
+            raise TypeError('can only accept list')
+        mp = dict()
+        hilbert = HilbertCurve(128, 2)
+        for point in lst:
+            mp[point] = hilbert.distance_from_coordinates(point)
+
+        reverse_hv_order = list()
+        for k, v in sorted(mp.items(), key=lambda x: x[1], reverse=True):
+            reverse_hv_order.append(k)
+
+        for p in reverse_hv_order:
+            self.insert(p[0], p[1])
+
     def insert(self, a, b):
+        if type(a) is not int or type(b) is not int:
+            raise TypeError('can only accept int, int')
         # insert procedure
         # a,b are two dimensions of a point
         p = self.Point(a, b)
@@ -241,33 +258,12 @@ class HilbertRtree:
                     idx = i
                     minimum_lhv = entry.LHV
                     next_entry = entry
-            if idx is not None:
-                resize_bb = self.genBB([bb, n.list_bb()[idx]])
-                n.replace_with(idx, resize_bb)
-                res = self.recursive_insert(bb, next_entry)
-                if res is not None:
-                    return self.process_return_nodes(res[0], res[1], n, idx)
-            else:
-                # can't find entry with LHV greater than bb.hv than choose the smallest one with the resize area
-                # see Rtree for detail
-                resize_bb_u = n.list_bb()[0]
-                area_d = sys.maxsize
-                idx = 0
-                for i, bb_n in enumerate(n.list_bb()):
-                    resize_bb = self.genBB([bb_n, bb])
-                    resize_area = self.get_size(resize_bb)
-                    area = self.get_size(bb_n)
 
-                    if resize_area - area < area_d:
-                        resize_bb_u = resize_bb
-                        area_d = resize_area - area
-                        idx = i
-
-                n.replace_with(idx, resize_bb_u)
-                res = self.recursive_insert(bb, n.map[resize_bb_u])
-                if res is not None:
-                    return self.process_return_nodes(res[0], res[1], n, idx)
-
+            resize_bb = self.genBB([bb, n.list_bb()[idx]])
+            n.replace_with(idx, resize_bb)
+            res = self.recursive_insert(bb, next_entry)
+            if res is not None:
+                return self.process_return_nodes(res[0], res[1], n, idx)
             return None
 
         else:
@@ -356,6 +352,37 @@ class HilbertRtree:
             raise TypeError("can only calculate the distance between two points")
         return ((p0.x - p1.x)**2 + (p0.y - p1.y)**2)**0.5
 
+    def get_min_max_dist_bb_to_p(self, bb, p):
+        # get the min max distance of the bb related to point p
+        if type(bb) is not self.BB or type(p) is not self.Point:
+            raise TypeError("must take Bounding box and a Point as input")
+
+        dist0 = self.cal_distance_euclidean(bb.urp, p)
+        dist1 = self.cal_distance_euclidean(bb.dlp, p)
+
+        dist2 = self.cal_distance_euclidean(self.Point(bb.dlp.x, bb.urp.y), p)
+        dist3 = self.cal_distance_euclidean(self.Point(bb.urp.x, bb.dlp.y), p)
+
+        maxdist = max(dist0, dist1, dist2, dist3)
+        mindist = min(dist0, dist1, dist2, dist3)
+
+        return mindist, maxdist
+
+    def sort_box(self, node, p):
+        if type(node) is not self.Node or type(p) is not self.Point:
+            raise TypeError("can only take node as input")
+        # sort boxes in nodes by its smallest dist to point p
+        mp = dict()
+        minimum_max = sys.maxsize
+        for bb in node.list_bb():
+            mp[bb] = self.get_min_max_dist_bb_to_p(bb, p)
+            minimum_max = min(minimum_max, mp[bb][1])
+
+        bbs = list()
+        for bb, dists in sorted(mp.items(), key=lambda v: v[1]):
+            bbs.append(bb)
+        return bbs, mp
+
     def bounded_NN_search(self, a, b, c, d, x, y, exclude):
         # using euclidean distance
         # a search algorithm that finds the nearest point of the given point within the given range
@@ -380,7 +407,11 @@ class HilbertRtree:
         mdis = sys.maxsize
 
         if n is not None:
-            for bb in n.list_bb():
+            bbs, mp = self.sort_box(n, point)
+            for bb in bbs:
+                # because boxes are sorted by its distance to point the remaining box can discard
+                if mp[bb][0] > mdis:
+                    break
                 if self.over_lapped(bb, region):
                     if bb is not None and self.is_point(bb) and (bb.dlp.x, bb.dlp.y) not in exclude:
                         dis = self.cal_distance_euclidean(bb.dlp, point)

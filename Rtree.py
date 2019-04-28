@@ -275,6 +275,37 @@ class Rtree:
             raise TypeError("can only calculate the distance between two points")
         return ((p0.x - p1.x)**2 + (p0.y - p1.y)**2)**0.5
 
+    def get_min_max_dist_bb_to_p(self, bb, p):
+        # get the min max distance of the bb related to point p
+        if type(bb) is not self.BB or type(p) is not self.Point:
+            raise TypeError("must take Bounding box and a Point as input")
+
+        dist0 = self.cal_distance_euclidean(bb.urp, p)
+        dist1 = self.cal_distance_euclidean(bb.dlp, p)
+
+        dist2 = self.cal_distance_euclidean(self.Point(bb.dlp.x, bb.urp.y), p)
+        dist3 = self.cal_distance_euclidean(self.Point(bb.urp.x, bb.dlp.y), p)
+
+        maxdist = max(dist0, dist1, dist2, dist3)
+        mindist = min(dist0, dist1, dist2, dist3)
+
+        return mindist, maxdist
+
+    def sort_box(self, node, p):
+        if type(node) is not self.Node or type(p) is not self.Point:
+            raise TypeError("can only take node as input")
+        # eliminate box with min distance to p smaller than minimum max distance of all boxes
+        mp = dict()
+        minimum_max = sys.maxsize
+        for bb in node.list_bb():
+            mp[bb] = self.get_min_max_dist_bb_to_p(bb, p)
+            minimum_max = min(minimum_max, mp[bb][1])
+
+        bbs = list()
+        for bb, dists in sorted(mp.items(), key=lambda v: v[1]):
+            bbs.append(bb)
+        return bbs, mp
+
     def query_region(self, a, b, c, d):
         if a > c or b > d:
             raise ValueError("point0 must be on the down right of the point1")
@@ -326,7 +357,11 @@ class Rtree:
         mdis = sys.maxsize
 
         if n is not None:
-            for bb in n.list_bb():
+            bbs, mp = self.sort_box(n, point)
+            for bb in bbs:
+                # because boxes are sorted by its distance to point the remaining box can discard
+                if mp[bb][0] > mdis:
+                    break
                 if self.over_lapped(bb, region):
                     if bb is not None and self.is_point(bb) and (bb.dlp.x, bb.dlp.y) not in exclude:
                         dis = self.cal_distance_euclidean(bb.dlp, point)

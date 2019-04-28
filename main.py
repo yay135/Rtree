@@ -10,11 +10,22 @@ def main0():
     htree = HilbertRtree(10)
     lst = set()
     print("generating random points...")
-    for _ in range(0, 1000000):
-        x = random.randint(1, 1000000)
-        y = random.randint(1, 1000000)
+    for _ in range(0, 100000):
+        x = random.randint(1, 10000000)
+        y = random.randint(1, 10000000)
         p = (x, y)
         lst.add(p)
+    # for _ in range(0, 200000):
+    #     x = random.randint(400000, 600000)
+    #     y = random.randint(400000, 600000)
+    #     p = (x, y)
+    #     lst.add(p)
+    #
+    # for _ in range(0, 200000):
+    #     x = random.randint(800000, 10000000)
+    #     y = random.randint(800000, 10000000)
+    #     p = (x, y)
+    #     lst.add(p)
     print("searching skyline 5 times using brute-force...")
     total = 0
     for _ in range(0, 5):
@@ -37,7 +48,7 @@ def main0():
     print("constructing trees...")
     for p in lst:
         tree.insert(p[0], p[1])
-        htree.insert(p[0], p[1])
+    htree.insert_list(lst)
     print("calculating skyline 5 times using R-tree...")
     total = 0
     for _ in range(0, 5):
